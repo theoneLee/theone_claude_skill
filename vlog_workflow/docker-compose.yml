@@ -1,0 +1,54 @@
+version: "3.8"
+
+# Vlog Workflow - Whisper 语音识别服务
+# 使用方式:
+#   CPU 模式: docker compose --profile cpu up -d
+#   GPU 模式: docker compose --profile gpu up -d
+
+services:
+  # ── CPU 模式（M1 Mac / 通用） ─────────────────────────────
+  speaches-cpu:
+    image: ghcr.io/speaches-ai/speaches
+    container_name: speaches
+    profiles: ["cpu"]
+    ports:
+      - "8000:8000"
+    volumes:
+      - ~/.cache/huggingface:/root/.cache/huggingface
+    environment:
+      - WHISPER__MODEL=large-v3
+      - WHISPER__DEVICE=cpu
+      - WHISPER__COMPUTE_TYPE=int8
+    restart: unless-stopped
+
+  # ── GPU 模式（AMD RX 7600 / ROCm） ───────────────────────
+  #
+  # RX 7600 = RDNA3 (gfx1102)，ROCm 官方目标为 gfx1100，
+  # 需要 HSA_OVERRIDE_GFX_VERSION=11.0.0 来兼容
+  #
+  # 前置条件:
+  #   1. 装有 RX 7600 的机器上安装 ROCm 6.0+
+  #   2. 安装 Docker 并配置好 ROCm 容器支持
+  #   3. 确认 /dev/kfd 和 /dev/dri 设备存在
+  #
+  speaches-gpu:
+    image: ghcr.io/speaches-ai/speaches
+    container_name: speaches
+    profiles: ["gpu"]
+    ports:
+      - "8000:8000"
+    volumes:
+      - ~/.cache/huggingface:/root/.cache/huggingface
+    devices:
+      - /dev/kfd:/dev/kfd
+      - /dev/dri:/dev/dri
+    environment:
+      - WHISPER__MODEL=large-v3
+      - WHISPER__DEVICE=cuda
+      - WHISPER__COMPUTE_TYPE=float16
+      # RX 7600 (gfx1102) 需要此变量来匹配 ROCm 目标
+      - HSA_OVERRIDE_GFX_VERSION=11.0.0
+    group_add:
+      - video
+      - render
+    restart: unless-stopped
